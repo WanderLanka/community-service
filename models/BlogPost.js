@@ -126,6 +126,46 @@ const blogPostSchema = new mongoose.Schema({
       default: true
     }
   },
+
+  // Hide feature - users who have hidden this post
+  hiddenBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    index: true
+  }],
+
+  // Report tracking
+  reportCount: {
+    type: Number,
+    default: 0,
+    index: true
+  },
+
+  totalReportScore: {
+    type: Number,
+    default: 0
+  },
+
+  isFlagged: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+
+  flaggedAt: {
+    type: Date,
+    default: null
+  },
+
+  flagReason: {
+    type: String,
+    default: null
+  },
+
+  flagSeverity: {
+    type: String,
+    enum: ['none', 'moderate', 'high', 'critical'],
+    default: 'none'
+  },
   
   // Timestamps
   createdAt: {
@@ -189,6 +229,46 @@ blogPostSchema.methods.decrementCommentsCount = function() {
   if (this.commentsCount > 0) {
     this.commentsCount -= 1;
   }
+  return this.save();
+};
+
+// Hide/Unhide methods
+blogPostSchema.methods.hideForUser = function(userId) {
+  if (!this.hiddenBy.includes(userId)) {
+    this.hiddenBy.push(userId);
+  }
+  return this.save();
+};
+
+blogPostSchema.methods.unhideForUser = function(userId) {
+  this.hiddenBy = this.hiddenBy.filter(id => id.toString() !== userId.toString());
+  return this.save();
+};
+
+blogPostSchema.methods.isHiddenForUser = function(userId) {
+  return this.hiddenBy.some(id => id.toString() === userId.toString());
+};
+
+// Report tracking methods
+blogPostSchema.methods.addReport = function(weightedScore) {
+  this.reportCount += 1;
+  this.totalReportScore += weightedScore;
+  return this.save();
+};
+
+blogPostSchema.methods.flagPost = function(severity, reason) {
+  this.isFlagged = true;
+  this.flaggedAt = new Date();
+  this.flagSeverity = severity;
+  this.flagReason = reason;
+  return this.save();
+};
+
+blogPostSchema.methods.unflagPost = function() {
+  this.isFlagged = false;
+  this.flaggedAt = null;
+  this.flagSeverity = 'none';
+  this.flagReason = null;
   return this.save();
 };
 

@@ -43,6 +43,11 @@ router.get('/posts', optionalAuth, async (req, res) => {
     let query = { status: 'published' };
     let sortOption = {};
 
+    // Filter out hidden posts if user is logged in
+    if (req.user && req.user.userId) {
+      query.hiddenBy = { $ne: req.user.userId };
+    }
+
     // Filter by author
     if (authorId) {
       query['author.userId'] = authorId;
