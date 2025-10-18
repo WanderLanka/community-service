@@ -2,11 +2,18 @@ const mongoose = require('mongoose');
 
 const commentSchema = new mongoose.Schema(
   {
-    // Reference to the blog post
+    // Reference to the blog post, question, or answer
     post: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'BlogPost',
       required: true,
+      index: true
+    },
+    
+    // Type of post this comment belongs to
+    postType: {
+      type: String,
+      enum: ['blogpost', 'question', 'answer'],
+      default: 'blogpost',
       index: true
     },
     
