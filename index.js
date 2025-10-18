@@ -6,6 +6,9 @@ const helmet = require('helmet');
 require('dotenv').config();
 
 const communityRoutes = require('./routes/communityRoutes');
+const commentRoutes = require('./routes/commentRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const qaRoutes = require('./routes/qaRoutes');
 
 const app = express();
 
@@ -81,14 +84,27 @@ mongoose.connection.on('reconnected', () => {
 
 // Debug: Log registered routes
 console.log('\n📋 Registering routes:');
-console.log('   /api/community/* → communityRoutes');
-console.log('   /posts → communityRoutes (for API Gateway proxy)\n');
+console.log('   /api/community/* → communityRoutes, commentRoutes, reportRoutes, qaRoutes');
+console.log('   /posts → communityRoutes (for API Gateway proxy)');
+console.log('   /comments → commentRoutes (for API Gateway proxy)');
+console.log('   /reports → reportRoutes (for API Gateway proxy)');
+console.log('   /questions → qaRoutes (for API Gateway proxy)\n');
 
 // Routes - handle both direct access and proxied requests
 // When accessed through API Gateway, the /api/community prefix is stripped
 app.use('/api/community', communityRoutes);
+app.use('/api/community', commentRoutes);
+app.use('/api/community', reportRoutes);
+app.use('/api/community', qaRoutes);
 app.use('/posts', communityRoutes); // For API Gateway (pathRewrite strips /api/community)
+app.use('/comments', commentRoutes); // For API Gateway (pathRewrite strips /api/community)
+app.use('/reports', reportRoutes); // For API Gateway (pathRewrite strips /api/community)
+app.use('/questions', qaRoutes); // For API Gateway (pathRewrite strips /api/community)
+app.use('/answers', qaRoutes); // For API Gateway (pathRewrite strips /api/community)
 app.use('/', communityRoutes); // Catch-all for root-level routes from proxy
+app.use('/', commentRoutes); // Catch-all for comments routes from proxy
+app.use('/', reportRoutes); // Catch-all for reports routes from proxy
+app.use('/', qaRoutes); // Catch-all for Q&A routes from proxy
 
 // Health check endpoint
 app.get('/health', (req, res) => {

@@ -26,33 +26,8 @@ const imageSchema = new mongoose.Schema({
   }
 });
 
-const commentSchema = new mongoose.Schema({
-  user: {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true
-    },
-    username: {
-      type: String,
-      required: true
-    },
-    avatar: String
-  },
-  content: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 500
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+// NOTE: Comment schema has been moved to a separate Comment model (models/Comment.js)
+// for better support of nested comments, likes, and efficient querying
 
 const blogPostSchema = new mongoose.Schema({
   // User information
@@ -121,7 +96,8 @@ const blogPostSchema = new mongoose.Schema({
     index: true
   },
   
-  comments: [commentSchema],
+  // NOTE: Comments are now stored in a separate Comment collection
+  // commentsCount tracks the total count for performance
   commentsCount: {
     type: Number,
     default: 0
@@ -137,6 +113,58 @@ const blogPostSchema = new mongoose.Schema({
   viewsCount: {
     type: Number,
     default: 0
+  },
+  
+  // Post settings
+  settings: {
+    allowComments: {
+      type: Boolean,
+      default: true
+    },
+    allowSharing: {
+      type: Boolean,
+      default: true
+    }
+  },
+
+  // Hide feature - users who have hidden this post
+  hiddenBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    index: true
+  }],
+
+  // Report tracking
+  reportCount: {
+    type: Number,
+    default: 0,
+    index: true
+  },
+
+  totalReportScore: {
+    type: Number,
+    default: 0
+  },
+
+  isFlagged: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+
+  flaggedAt: {
+    type: Date,
+    default: null
+  },
+
+  flagReason: {
+    type: String,
+    default: null
+  },
+
+  flagSeverity: {
+    type: String,
+    enum: ['none', 'moderate', 'high', 'critical'],
+    default: 'none'
   },
   
   // Timestamps
@@ -163,7 +191,7 @@ blogPostSchema.index({ status: 1, createdAt: -1 });
 // Pre-save middleware to update counts
 blogPostSchema.pre('save', function(next) {
   this.likesCount = this.likes.length;
-  this.commentsCount = this.comments.length;
+  // commentsCount is managed by Comment model methods
   this.updatedAt = Date.now();
   next();
 });
@@ -184,25 +212,63 @@ blogPostSchema.methods.removeLike = function(userId) {
   return this.save();
 };
 
-blogPostSchema.methods.addComment = function(userId, username, content, avatar) {
-  this.comments.push({
-    user: { userId, username, avatar },
-    content,
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  });
-  this.commentsCount = this.comments.length;
-  return this.save();
-};
-
-blogPostSchema.methods.removeComment = function(commentId) {
-  this.comments = this.comments.filter(comment => comment._id.toString() !== commentId.toString());
-  this.commentsCount = this.comments.length;
-  return this.save();
-};
+// NOTE: addComment and removeComment methods have been removed.
+// Use the Comment model directly (models/Comment.js) for comment operations.
 
 blogPostSchema.methods.incrementViews = function() {
   this.viewsCount += 1;
+  return this.save();
+};
+
+blogPostSchema.methods.incrementCommentsCount = function() {
+  this.commentsCount += 1;
+  return this.save();
+};
+
+blogPostSchema.methods.decrementCommentsCount = function() {
+  if (this.commentsCount > 0) {
+    this.commentsCount -= 1;
+  }
+  return this.save();
+};
+
+// Hide/Unhide methods
+blogPostSchema.methods.hideForUser = function(userId) {
+  if (!this.hiddenBy.includes(userId)) {
+    this.hiddenBy.push(userId);
+  }
+  return this.save();
+};
+
+blogPostSchema.methods.unhideForUser = function(userId) {
+  this.hiddenBy = this.hiddenBy.filter(id => id.toString() !== userId.toString());
+  return this.save();
+};
+
+blogPostSchema.methods.isHiddenForUser = function(userId) {
+  return this.hiddenBy.some(id => id.toString() === userId.toString());
+};
+
+// Report tracking methods
+blogPostSchema.methods.addReport = function(weightedScore) {
+  this.reportCount += 1;
+  this.totalReportScore += weightedScore;
+  return this.save();
+};
+
+blogPostSchema.methods.flagPost = function(severity, reason) {
+  this.isFlagged = true;
+  this.flaggedAt = new Date();
+  this.flagSeverity = severity;
+  this.flagReason = reason;
+  return this.save();
+};
+
+blogPostSchema.methods.unflagPost = function() {
+  this.isFlagged = false;
+  this.flaggedAt = null;
+  this.flagSeverity = 'none';
+  this.flagReason = null;
   return this.save();
 };
 

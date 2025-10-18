@@ -43,6 +43,11 @@ router.get('/posts', optionalAuth, async (req, res) => {
     let query = { status: 'published' };
     let sortOption = {};
 
+    // Filter out hidden posts if user is logged in
+    if (req.user && req.user.userId) {
+      query.hiddenBy = { $ne: req.user.userId };
+    }
+
     // Filter by author
     if (authorId) {
       query['author.userId'] = authorId;
@@ -184,7 +189,7 @@ router.post('/posts',
         });
       }
 
-      const { title, content, tags, locationName, latitude, longitude } = req.body;
+      const { title, content, tags, locationName, latitude, longitude, allowComments, allowSharing } = req.body;
 
       // Upload images to Cloudinary
       let uploadedImages = [];
@@ -229,6 +234,10 @@ router.post('/posts',
         tags: Array.isArray(tags) ? tags : [],
         location: locationData,
         images: uploadedImages,
+        settings: {
+          allowComments: allowComments === 'true' || allowComments === true,
+          allowSharing: allowSharing === 'true' || allowSharing === true
+        },
         status: 'published'
       });
 
@@ -458,120 +467,8 @@ router.delete('/posts/:id/like', verifyToken, async (req, res) => {
   }
 });
 
-/**
- * @route   POST /api/community/posts/:id/comments
- * @desc    Add a comment to a blog post
- * @access  Private
- */
-router.post('/posts/:id/comments',
-  verifyToken,
-  [
-    body('content').trim().notEmpty().isLength({ min: 1, max: 500 }).withMessage('Comment must be between 1 and 500 characters')
-  ],
-  async (req, res) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: errors.array()
-        });
-      }
-
-      const post = await BlogPost.findById(req.params.id);
-
-      if (!post) {
-        return res.status(404).json({
-          success: false,
-          message: 'Post not found'
-        });
-      }
-
-      await post.addComment(
-        req.user.userId,
-        req.user.username,
-        req.body.content,
-        req.user.avatar
-      );
-
-      console.log(`💬 ${req.user.username} commented on post: ${post.title}`);
-
-      res.status(201).json({
-        success: true,
-        message: 'Comment added successfully',
-        data: {
-          comment: post.comments[post.comments.length - 1],
-          commentsCount: post.commentsCount
-        }
-      });
-    } catch (error) {
-      console.error('❌ Error adding comment:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Error adding comment',
-        error: error.message
-      });
-    }
-  }
-);
-
-/**
- * @route   DELETE /api/community/posts/:id/comments/:commentId
- * @desc    Delete a comment from a blog post
- * @access  Private (comment author only)
- */
-router.delete('/posts/:id/comments/:commentId', verifyToken, async (req, res) => {
-  try {
-    const post = await BlogPost.findById(req.params.id);
-
-    if (!post) {
-      return res.status(404).json({
-        success: false,
-        message: 'Post not found'
-      });
-    }
-
-    const comment = post.comments.id(req.params.commentId);
-
-    if (!comment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Comment not found'
-      });
-    }
-
-    // Check if user is the comment author or post author
-    if (
-      comment.user.userId.toString() !== req.user.userId.toString() &&
-      post.author.userId.toString() !== req.user.userId.toString()
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: 'You can only delete your own comments or comments on your posts'
-      });
-    }
-
-    await post.removeComment(req.params.commentId);
-
-    console.log(`🗑️ Comment deleted from post: ${post.title}`);
-
-    res.json({
-      success: true,
-      message: 'Comment deleted successfully',
-      data: {
-        commentsCount: post.commentsCount
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error deleting comment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting comment',
-      error: error.message
-    });
-  }
-});
+// NOTE: Comment routes have been moved to commentRoutes.js for better organization
+// and to support nested comments with likes. See /routes/commentRoutes.js
 
 /**
  * @route   GET /api/community/posts/user/:userId
