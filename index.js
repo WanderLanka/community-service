@@ -9,6 +9,7 @@ const communityRoutes = require('./routes/communityRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const qaRoutes = require('./routes/qaRoutes');
+const mapPointRoutes = require('./routes/mapPointRoutes');
 
 const app = express();
 
@@ -32,8 +33,13 @@ app.use(cors({
   origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:8081'],
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Increase payload size limits for image uploads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Set server timeout to 5 minutes for large file uploads
+app.timeout = 300000; // 5 minutes
 
 // Rate limiting
 const limiter = rateLimit({
@@ -84,29 +90,14 @@ mongoose.connection.on('reconnected', () => {
 
 // Debug: Log registered routes
 console.log('\n📋 Registering routes:');
-console.log('   /api/community/* → communityRoutes, commentRoutes, reportRoutes, qaRoutes');
+console.log('   /api/community/* → communityRoutes, commentRoutes, reportRoutes, qaRoutes, mapPointRoutes');
 console.log('   /posts → communityRoutes (for API Gateway proxy)');
 console.log('   /comments → commentRoutes (for API Gateway proxy)');
 console.log('   /reports → reportRoutes (for API Gateway proxy)');
-console.log('   /questions → qaRoutes (for API Gateway proxy)\n');
+console.log('   /questions → qaRoutes (for API Gateway proxy)');
+console.log('   /map-points → mapPointRoutes (for API Gateway proxy)\n');
 
-// Routes - handle both direct access and proxied requests
-// When accessed through API Gateway, the /api/community prefix is stripped
-app.use('/api/community', communityRoutes);
-app.use('/api/community', commentRoutes);
-app.use('/api/community', reportRoutes);
-app.use('/api/community', qaRoutes);
-app.use('/posts', communityRoutes); // For API Gateway (pathRewrite strips /api/community)
-app.use('/comments', commentRoutes); // For API Gateway (pathRewrite strips /api/community)
-app.use('/reports', reportRoutes); // For API Gateway (pathRewrite strips /api/community)
-app.use('/questions', qaRoutes); // For API Gateway (pathRewrite strips /api/community)
-app.use('/answers', qaRoutes); // For API Gateway (pathRewrite strips /api/community)
-app.use('/', communityRoutes); // Catch-all for root-level routes from proxy
-app.use('/', commentRoutes); // Catch-all for comments routes from proxy
-app.use('/', reportRoutes); // Catch-all for reports routes from proxy
-app.use('/', qaRoutes); // Catch-all for Q&A routes from proxy
-
-// Health check endpoint
+// Health check endpoint - must be before catch-all routes
 app.get('/health', (req, res) => {
   res.json({
     success: true,
@@ -117,6 +108,27 @@ app.get('/health', (req, res) => {
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
+
+// Import review routes
+const reviewRoutes = require('./routes/reviewRoutes');
+
+// Routes - handle both direct access and proxied requests
+// All routes define their full paths
+app.use('/api/community', communityRoutes);
+app.use('/api/community', commentRoutes);
+app.use('/api/community', reportRoutes);
+app.use('/api/community', qaRoutes);
+app.use('/api/community', mapPointRoutes); // Routes already have /map-points prefix
+app.use('/api/community', reviewRoutes); // Review routes
+
+// For API Gateway proxy (after /api/community is stripped by pathRewrite)
+// Mount at root so routes like /posts, /questions, /map-points work directly
+app.use('/', communityRoutes);
+app.use('/', commentRoutes);
+app.use('/', reportRoutes);
+app.use('/', qaRoutes);
+app.use('/', mapPointRoutes); // Routes already have /map-points prefix
+app.use('/', reviewRoutes); // Review routes
 
 // Root endpoint
 app.get('/', (req, res) => {
