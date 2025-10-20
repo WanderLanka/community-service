@@ -195,6 +195,69 @@ router.post(
 );
 
 /**
+ * @route   GET /api/community/map-points/my-points
+ * @desc    Get current user's map points
+ * @access  Private
+ */
+router.get('/map-points/my-points', verifyToken, async (req, res) => {
+  console.log('\n📍 Fetching user\'s map points...');
+  
+  try {
+    const { page = 1, limit = 20, status } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query
+    const query = {
+      'author.userId': req.user.userId
+    };
+
+    // Filter by status if provided
+    if (status && ['published', 'draft', 'archived'].includes(status)) {
+      query.status = status;
+    }
+
+    console.log('🔍 Query:', JSON.stringify(query));
+
+    // Get map points
+    const mapPoints = await MapPoint.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Get total count
+    const total = await MapPoint.countDocuments(query);
+
+    console.log(`✅ Found ${mapPoints.length} map points for user ${req.user.userId}`);
+
+    res.json({
+      success: true,
+      data: {
+        mapPoints: mapPoints.map(point => ({
+          ...point,
+          id: point._id,
+          _id: point._id.toString()
+        })),
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching user map points:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch map points',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route   GET /api/community/map-points/popular
  * @desc    Get popular map points
  * @access  Public
@@ -421,7 +484,7 @@ router.get('/map-points/:id', optionalAuth, async (req, res) => {
  * @desc    Update a map point
  * @access  Private (author only)
  */
-router.put('/:id', verifyToken, async (req, res) => {
+router.put('/map-points/:id', verifyToken, async (req, res) => {
   try {
     const mapPoint = await MapPoint.findById(req.params.id);
 
@@ -473,7 +536,7 @@ router.put('/:id', verifyToken, async (req, res) => {
  * @desc    Delete a map point
  * @access  Private (author only)
  */
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/map-points/:id', verifyToken, async (req, res) => {
   try {
     const mapPoint = await MapPoint.findById(req.params.id);
 
@@ -523,7 +586,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
  * @desc    Like/unlike a map point
  * @access  Private
  */
-router.post('/:id/like', verifyToken, async (req, res) => {
+router.post('/map-points/:id/like', verifyToken, async (req, res) => {
   try {
     const mapPoint = await MapPoint.findById(req.params.id);
 
@@ -588,7 +651,7 @@ router.post('/:id/like', verifyToken, async (req, res) => {
  * @desc    Save/unsave a map point
  * @access  Private
  */
-router.post('/:id/save', verifyToken, async (req, res) => {
+router.post('/map-points/:id/save', verifyToken, async (req, res) => {
   try {
     const mapPoint = await MapPoint.findById(req.params.id);
 
