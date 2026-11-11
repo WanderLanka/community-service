@@ -1,3 +1,7 @@
 node_modules/
 .env
 QA_API_DOCUMENTATION.md
+
+# Generated dependency copies and operating-system metadata
+node_modules*/
+.DS_Store
