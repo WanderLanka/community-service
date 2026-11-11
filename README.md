@@ -70,8 +70,8 @@ JWT_SECRET=your_jwt_secret_key_here
 
 # Cloudinary Configuration
 CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=854478446649167
-CLOUDINARY_API_SECRET=eARiWFRKkGgaUmrHp5Z9F19ZuHA
+CLOUDINARY_API_KEY=replace-me
+CLOUDINARY_API_SECRET=replace-me
 
 # CORS (comma-separated origins)
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8081

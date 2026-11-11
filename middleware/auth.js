@@ -1,3 +1,4 @@
+const { verifyAccess } = require('../security');
 const jwt = require('jsonwebtoken');
 
 /**
@@ -7,7 +8,7 @@ const verifyToken = (req, res, next) => {
   try {
     // Get token from header
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
@@ -28,8 +29,8 @@ const verifyToken = (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+    const decoded = verifyAccess(token, process.env.JWT_SECRET);
+
     // Attach user info to request
     req.user = {
       userId: decoded.userId,
@@ -43,7 +44,7 @@ const verifyToken = (req, res, next) => {
     next();
   } catch (error) {
     console.error('Token verification error:', error.message);
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
@@ -51,7 +52,7 @@ const verifyToken = (req, res, next) => {
         code: 'INVALID_TOKEN'
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
@@ -102,7 +103,7 @@ const verifyRole = (allowedRoles) => {
 const optionalAuth = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next();
     }
@@ -112,7 +113,7 @@ const optionalAuth = (req, res, next) => {
       return next();
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = verifyAccess(token, process.env.JWT_SECRET);
     req.user = {
       userId: decoded.userId,
       username: decoded.username,

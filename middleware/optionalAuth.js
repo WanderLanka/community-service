@@ -1,3 +1,4 @@
+const { verifyAccess } = require('../security');
 const jwt = require('jsonwebtoken');
 
 /**
@@ -10,7 +11,7 @@ const optionalAuth = (req, res, next) => {
   try {
     // Get token from header
     const authHeader = req.headers.authorization;
-    
+
     // If no auth header, continue without user info
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       req.user = undefined;
@@ -27,8 +28,8 @@ const optionalAuth = (req, res, next) => {
 
     // Try to verify token
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
+      const decoded = verifyAccess(token, process.env.JWT_SECRET);
+
       // Attach user info to request
       req.user = {
         userId: decoded.userId,

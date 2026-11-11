@@ -1,3 +1,4 @@
+const { start, installReadiness } = require('./runtime');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -12,20 +13,7 @@ const qaRoutes = require('./routes/qaRoutes');
 const mapPointRoutes = require('./routes/mapPointRoutes');
 
 const app = express();
-
-// Debug middleware - log ALL incoming requests
-app.use((req, res, next) => {
-  console.log('\n' + '='.repeat(60));
-  console.log('📥 INCOMING REQUEST:');
-  console.log(`   Method: ${req.method}`);
-  console.log(`   URL: ${req.url}`);
-  console.log(`   Original URL: ${req.originalUrl}`);
-  console.log(`   Path: ${req.path}`);
-  console.log(`   Base URL: ${req.baseUrl}`);
-  console.log(`   Headers:`, JSON.stringify(req.headers, null, 2));
-  console.log('='.repeat(60) + '\n');
-  next();
-});
+installReadiness(app);
 
 // Middleware
 app.use(helmet()); // Security headers
@@ -67,17 +55,6 @@ const createPostLimiter = rateLimit({
 });
 
 app.use('/api/community/posts', createPostLimiter);
-
-// MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log('✅ MongoDB connected successfully');
-    console.log(`🗄️ Database: ${mongoose.connection.name}`);
-  })
-  .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
-    process.exit(1);
-  });
 
 // MongoDB connection event handlers
 mongoose.connection.on('disconnected', () => {
@@ -166,7 +143,7 @@ app.use((req, res) => {
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('❌ Global error handler:', err);
-  
+
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal server error',
@@ -174,40 +151,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('\n⚠️ Received SIGINT, shutting down gracefully...');
-  try {
-    await mongoose.connection.close();
-    console.log('✅ MongoDB connection closed');
-    process.exit(0);
-  } catch (err) {
-    console.error('❌ Error during shutdown:', err);
-    process.exit(1);
-  }
-});
 
-process.on('SIGTERM', async () => {
-  console.log('\n⚠️ Received SIGTERM, shutting down gracefully...');
-  try {
-    await mongoose.connection.close();
-    console.log('✅ MongoDB connection closed');
-    process.exit(0);
-  } catch (err) {
-    console.error('❌ Error during shutdown:', err);
-    process.exit(1);
-  }
-});
-
-// Start server
-const PORT = process.env.PORT || 3007;
-app.listen(PORT, () => {
-  console.log('\n' + '='.repeat(50));
-  console.log(`🚀 Community Service running on port ${PORT}`);
-  console.log(`📍 Local: http://localhost:${PORT}`);
-  console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🖼️ Cloudinary: ${process.env.CLOUDINARY_CLOUD_NAME}`);
-  console.log('='.repeat(50) + '\n');
-});
+if (require.main === module) {
+  start(app, { connect: () => mongoose.connect(process.env.MONGO_URI), port: process.env.PORT || 3007 }).catch(error => {
+    console.error('Service startup failed:', error.message);
+    process.exitCode = 1;
+  });
+}
 
 module.exports = app;
